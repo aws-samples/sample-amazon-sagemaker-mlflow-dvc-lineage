@@ -1,0 +1,32 @@
+# IDE and OS
+.idea/
+.DS_Store
+*.bkp
+
+# Python
+__pycache__/
+.venv
+
+# Local tool configs
+.local
+.kiro
+.claude
+
+# Jupyter
+**/*.ipynb_checkpoints/
+
+# Project artifacts
+sagemaker-dvc-sample
+dataset.csv
+registry_v2.csv
+
+# DVC repos created by notebooks
+cifar10-dvc-demo
+cxr-dvc-demo/
+
+# Montgomery CXR dataset (downloaded from NLM)
+MontgomerySet/
+*.zip
+
+# Generated manifests
+master_manifest.csv

@@ -1,0 +1,239 @@
+{
+  "$schema": "https://cyclonedx.org/schema/bom-1.5.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-01-29T00:00:00Z",
+    "component": {
+      "type": "application",
+      "name": "dvc-mlflow-sagemaker-demo",
+      "version": "1.0.0",
+      "description": "End-to-End ML Traceability with DVC and MLflow on Amazon SageMaker AI",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT-0"
+          }
+        }
+      ],
+      "supplier": {
+        "name": "Amazon Web Services"
+      }
+    }
+  },
+  "components": [
+    {
+      "type": "framework",
+      "name": "torch",
+      "version": ">=2.5.0",
+      "description": "PyTorch deep learning framework",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/torch@2.5.0"
+    },
+    {
+      "type": "framework",
+      "name": "torchvision",
+      "version": ">=0.20.0",
+      "description": "PyTorch vision library with pretrained models",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/torchvision@0.20.0"
+    },
+    {
+      "type": "library",
+      "name": "mlflow",
+      "version": ">=3.0.0",
+      "description": "ML experiment tracking and model registry",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/mlflow@3.0.0"
+    },
+    {
+      "type": "library",
+      "name": "sagemaker-mlflow",
+      "version": ">=0.2.0",
+      "description": "SageMaker AI MLflow integration",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/sagemaker-mlflow@0.2.0"
+    },
+    {
+      "type": "library",
+      "name": "dvc",
+      "version": ">=3.50.0",
+      "description": "Data Version Control for ML projects",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/dvc@3.50.0"
+    },
+    {
+      "type": "library",
+      "name": "boto3",
+      "version": ">=1.42.1",
+      "description": "AWS SDK for Python",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/boto3@1.42.1"
+    },
+    {
+      "type": "library",
+      "name": "pandas",
+      "version": ">=2.0.0",
+      "description": "Data analysis library",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/pandas@2.0.0"
+    },
+    {
+      "type": "library",
+      "name": "numpy",
+      "version": ">=1.24.0",
+      "description": "Numerical computing library",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/numpy@1.24.0"
+    },
+    {
+      "type": "library",
+      "name": "scikit-learn",
+      "version": ">=1.2.1",
+      "description": "Machine learning library",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/scikit-learn@1.2.1"
+    },
+    {
+      "type": "library",
+      "name": "Pillow",
+      "version": ">=9.0.0",
+      "description": "Python Imaging Library",
+      "licenses": [
+        {
+          "license": {
+            "id": "HPND"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/Pillow@9.0.0"
+    },
+    {
+      "type": "library",
+      "name": "git-remote-codecommit",
+      "version": "latest",
+      "description": "Git remote helper for AWS CodeCommit",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/git-remote-codecommit"
+    }
+  ],
+  "externalReferences": [
+    {
+      "type": "website",
+      "url": "https://github.com/aws-samples"
+    },
+    {
+      "type": "documentation",
+      "url": "https://docs.aws.amazon.com/sagemaker/latest/dg/mlflow.html"
+    },
+    {
+      "type": "documentation",
+      "url": "https://dvc.org/doc"
+    }
+  ],
+  "formulation": [
+    {
+      "components": [
+        {
+          "type": "machine-learning-model",
+          "name": "MobileNetV3-Small",
+          "version": "IMAGENET1K_V1",
+          "description": "Pretrained base model - architecture by Google (Apache-2.0), implementation and weights from torchvision (BSD-3-Clause)",
+          "licenses": [
+            {
+              "license": {
+                "id": "Apache-2.0",
+                "name": "Original MobileNet architecture by Google"
+              }
+            },
+            {
+              "license": {
+                "id": "BSD-3-Clause",
+                "name": "torchvision implementation and pretrained weights"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "name": "Amazon SageMaker AI",
+      "description": "ML platform for training and deployment"
+    },
+    {
+      "name": "Amazon S3",
+      "description": "Object storage for DVC data and MLflow artifacts"
+    },
+    {
+      "name": "AWS CodeCommit",
+      "description": "Git repository for DVC metadata"
+    },
+    {
+      "name": "SageMaker AI MLflow App",
+      "description": "Managed MLflow tracking server"
+    }
+  ]
+}

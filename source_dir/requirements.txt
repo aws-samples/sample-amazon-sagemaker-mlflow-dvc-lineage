@@ -1,0 +1,19 @@
+# PyTorch
+torch>=2.5.0
+torchvision>=0.20.0
+
+# MLflow
+mlflow>=3.0.0
+sagemaker-mlflow>=0.2.0
+
+# DVC
+dvc[s3]>=3.50.0
+
+# Utilities
+Pillow>=9.0.0,<12.0
+numpy>=1.24.0,<2.0
+scikit-learn>=1.3.0
+
+# AWS CodeCommit
+six  # Required build dependency for git-remote-codecommit
+git-remote-codecommit==1.17

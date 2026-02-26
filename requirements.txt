@@ -1,0 +1,25 @@
+# SageMaker SDK v3.4.0 (requires >3.4.0 for fix to work with MLflow 3+)
+sagemaker>=3.4.0 
+sagemaker-mlflow>=0.2.0
+
+# AWS
+boto3>=1.42.1
+
+# MLflow
+mlflow==3.4.0
+
+# PyTorch (required for ModelBuilder custom translators and local testing)
+torch>=2.5.0
+torchvision>=0.20.0
+
+# Data processing - pin numpy <2.0 to avoid conflicts with autogluon, catboost, gluonts
+pandas>=2.0.0
+numpy>=1.24.0,<2.0
+Pillow>=9.0.0,<12.0
+
+# DVC
+dvc[s3]>=3.50.0
+
+# AWS CodeCommit integration
+six  # Required build dependency for git-remote-codecommit
+git-remote-codecommit==1.17
