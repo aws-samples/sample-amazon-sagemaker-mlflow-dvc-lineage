@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: MIT-0
 
 """
-Audit query example functions for healthcare compliance.
+Audit query functions for healthcare compliance.
 
 Query MLflow to answer compliance questions like:
 - "Which models were trained using patient X's scans?"
+- "Verify that patient X was excluded from all models after date Y"
 """
 
 import csv
@@ -78,3 +79,85 @@ def find_models_with_patient(patient_id, experiment_name=None):
         print(f"  - {r['run_name']} (data version: {r['data_version']})")
 
     return results
+
+
+def verify_patient_excluded_after_date(patient_id, after_date, experiment_name=None):
+    """
+    Verify that a patient is excluded from all models trained after a date.
+
+    Args:
+        patient_id: Patient ID to check (e.g., 'PAT-00023')
+        after_date: Date string in 'YYYY-MM-DD' format
+        experiment_name: Optional MLflow experiment name to filter
+
+    Returns:
+        dict with: status ('PASSED'/'FAILED'), checked_runs, violations
+    """
+    client = MlflowClient()
+    cutoff_ms = int(datetime.strptime(after_date, "%Y-%m-%d").timestamp() * 1000)
+
+    filter_string = 'tags.stage = "training"'
+    kwargs = {"filter_string": filter_string, "order_by": ["start_time DESC"]}
+    if experiment_name:
+        experiment = client.get_experiment_by_name(experiment_name)
+        if not experiment:
+            print(f"Experiment '{experiment_name}' not found")
+            return {"status": "ERROR", "checked_runs": 0, "violations": []}
+        kwargs["experiment_ids"] = [experiment.experiment_id]
+
+    runs = client.search_runs(**kwargs)
+    runs_after = [r for r in runs if r.info.start_time >= cutoff_ms]
+
+    violations = []
+    for run in runs_after:
+        try:
+            manifest_path = mlflow.artifacts.download_artifacts(
+                run_id=run.info.run_id, artifact_path="manifest.csv"
+            )
+        except Exception:
+            continue
+
+        with open(manifest_path, 'r') as f:
+            if any(row['patient_id'] == patient_id for row in csv.DictReader(f)):
+                violations.append({
+                    'run_id': run.info.run_id,
+                    'run_name': run.info.run_name,
+                    'data_version': run.data.params.get('data_version', 'unknown'),
+                })
+
+    status = "PASSED" if not violations else "FAILED"
+    if violations:
+        for v in violations:
+            print(f"  VIOLATION: {v['run_name']} (data version: {v['data_version']})")
+    else:
+        print(f"  Patient not found in any post-{after_date} models")
+
+    return {"status": status, "checked_runs": len(runs_after), "violations": violations}
+
+
+def get_patients_in_model(run_id):
+    """
+    List all patient IDs in a specific model's training data.
+
+    Args:
+        run_id: MLflow run ID
+
+    Returns:
+        List of unique patient IDs
+    """
+    try:
+        manifest_path = mlflow.artifacts.download_artifacts(
+            run_id=run_id, artifact_path="manifest.csv"
+        )
+    except Exception:
+        print(f"No manifest artifact found for run {run_id}")
+        return []
+
+    patient_ids = set()
+    with open(manifest_path, 'r') as f:
+        for row in csv.DictReader(f):
+            patient_ids.add(row['patient_id'])
+
+    patient_list = sorted(patient_ids)
+    print(f"Run {run_id}: {len(patient_list)} patients in training data")
+    return patient_list
