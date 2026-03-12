@@ -136,6 +136,28 @@ DVC and MLflow provide traceability and experiment tracking, but are not tamper-
 - **AWS CloudTrail** for independent, append-only logging of all access to storage and training infrastructure
 - **IAM policies** enforcing least-privilege access to production buckets, MLflow tracking servers, and Git repositories
 
+## DVC Storage Efficiency
+
+DVC uses [content-addressable storage](https://dvc.org/doc/user-guide/project-structure/internal-files#files) (MD5 hashes), so only new or modified files are stored — not full dataset copies. Files with identical contents are stored once, even across different dataset versions. However, if preprocessing changes modify existing files, all affected files get new hashes and are stored as new objects.
+
+You can verify this behavior by checking S3 storage size between versions:
+
+```bash
+# After initial dataset version
+dvc add data/images && dvc push
+aws s3 ls s3://your-bucket/path/ --recursive --summarize
+
+# After adding new images (no preprocessing change) — storage increases only for new files
+dvc add data/images && dvc push
+aws s3 ls s3://your-bucket/path/ --recursive --summarize
+
+# After changing preprocessing on all images — full dataset stored as new objects
+dvc add data/images && dvc push
+aws s3 ls s3://your-bucket/path/ --recursive --summarize
+```
+
+For historical dataset versions that are rarely accessed, consider [S3 Intelligent-Tiering](https://aws.amazon.com/s3/storage-classes/intelligent-tiering/) on your DVC remote bucket — objects remain immediately accessible to `dvc pull` across the default tiers. [S3 Glacier lifecycle policies](https://aws.amazon.com/s3/storage-classes/glacier/) can further reduce costs, but objects must be [restored](https://docs.aws.amazon.com/AmazonS3/latest/userguide/restoring-objects.html) before `dvc pull` can access them.
+
 ## License
 
 This library is licensed under the MIT-0 License. See the [LICENSE](LICENSE) file.
