@@ -6,7 +6,7 @@ sagemaker-mlflow>=0.2.0
 boto3>=1.42.1
 
 # MLflow
-mlflow==3.4.0
+mlflow==3.9.0rc0
 
 # PyTorch (required for ModelBuilder custom translators and local testing)
 torch>=2.5.0
