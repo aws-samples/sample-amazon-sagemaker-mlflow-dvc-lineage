@@ -6,7 +6,9 @@ PyTorch MobileNetV3-Small Training Script for Chest X-Ray Classification
 
 This script fine-tunes a pretrained MobileNetV3-Small model on chest X-ray
 image data (Montgomery County CXR dataset) that has been versioned with DVC.
-It logs metrics, the patient-level manifest, and registers the model to MLflow.
+It logs metrics, the patient-level manifest, and the model to MLflow.
+Registration to the MLflow Model Registry happens in the notebook, after an
+inference specification has been attached to the logged model.
 
 Usage:
     Called by SageMaker ModelTrainer with environment variables:
@@ -45,6 +47,50 @@ OUTPUT_PATH = '/opt/ml/output'
 MODEL_PATH = '/opt/ml/model'
 DVC_REPO_PATH = tempfile.mkdtemp(prefix='dvc_repo_')
 DATASET_PATH = f'{DVC_REPO_PATH}/dataset'
+
+
+def get_sagemaker_job_tags():
+    """Build MLflow tags describing the SageMaker Training job running this script.
+
+    SageMaker injects TRAINING_JOB_ARN and TRAINING_JOB_NAME into the container
+    environment, and the training toolkit exposes the job configuration as the
+    SM_TRAINING_ENV JSON document. The same tags are set on the MLflow run and
+    on the logged model so both can be traced back to the job (and to its
+    CloudWatch logs and console page).
+    """
+    job_arn = os.environ.get('TRAINING_JOB_ARN')
+    job_name = os.environ.get('TRAINING_JOB_NAME')
+    sm_training_env = json.loads(os.environ.get('SM_TRAINING_ENV', '{}'))
+
+    if not job_name:
+        job_name = sm_training_env.get('job_name')
+    if not job_name and job_arn:
+        job_name = job_arn.rsplit('/', 1)[-1]
+
+    if not job_arn and not job_name:
+        return {'sagemaker.runtime': 'local'}
+
+    region = os.environ.get('AWS_REGION') or (job_arn.split(':')[3] if job_arn else None)
+
+    tags = {
+        'sagemaker.runtime': 'sagemaker',
+        'sagemaker.training_job_name': job_name,
+        'mlflow.source.type': 'JOB',
+    }
+    if job_arn:
+        tags['sagemaker.training_job_arn'] = job_arn
+    if region and job_name:
+        tags['mlflow.source.name'] = (
+            f"https://{region}.console.aws.amazon.com/sagemaker/home"
+            f"?region={region}#/jobs/{job_name}"
+        )
+    image = sm_training_env.get('additional_framework_parameters', {}).get('sagemaker_training_image')
+    if image:
+        tags['sagemaker.container_image'] = image
+    instance_type = os.environ.get('SM_CURRENT_INSTANCE_TYPE') or sm_training_env.get('current_instance_type')
+    if instance_type:
+        tags['sagemaker.instance_type'] = instance_type
+    return tags
 
 
 def fetch_data_from_dvc():
@@ -169,7 +215,8 @@ def main():
     pipeline_run_id = os.environ.get('PIPELINE_RUN_ID', data_version)
     tracking_uri = os.environ.get('MLFLOW_TRACKING_URI', 'mlruns')
     experiment_name = os.environ.get('MLFLOW_EXPERIMENT_NAME', 'cxr-classification')
-    registered_model_name = os.environ.get('MLFLOW_REGISTERED_MODEL_NAME', 'CXR-MobileNetV3')
+    # Name of the logged model artifact (also used as the registered model name by the notebook)
+    model_name = os.environ.get('MLFLOW_REGISTERED_MODEL_NAME', 'CXR-MobileNetV3')
     
     # Fetch data from DVC
     data_git_commit_id = fetch_data_from_dvc()
@@ -188,12 +235,14 @@ def main():
     
     try:
         with mlflow.start_run(run_name=run_name) as run:
-            # Set tags
+            # Set tags: lineage tags plus the SageMaker Training job that produced this run
+            sagemaker_job_tags = get_sagemaker_job_tags()
             mlflow.set_tags({
                 "pipeline_run_id": pipeline_run_id,
                 "stage": "training",
                 "data_version": data_version,
-                "model_type": "mobilenet_v3_small"
+                "model_type": "mobilenet_v3_small",
+                **sagemaker_job_tags,
             })
             
             # Load datasets
@@ -305,17 +354,33 @@ def main():
                 sample_output.numpy()
             )
             
-            # Log and register model
-            mlflow.pytorch.log_model(
+            # Log the model (do NOT register it here). The notebook attaches an
+            # inference.py and a SageMaker inference specification to this logged
+            # model and then calls mlflow.register_model(); with the MLflow App in
+            # AutoModelRegistrationEnabled mode that single call syncs a deployable
+            # Model Package to the SageMaker Model Registry.
+            # MLflow >= 3.15 defaults serialization_format to "pt2" (torch.export
+            # traced graph), which requires an input_example and fixes the traced
+            # input shape. Use "pickle" to save the eager nn.Module.
+            model_info = mlflow.pytorch.log_model(
                 model,
-                name=registered_model_name,
+                name=model_name,
                 signature=signature,
-                registered_model_name=registered_model_name,
+                serialization_format="pickle",
+                # Tags on the logged model itself (MLflow 3 entity), so the model can be
+                # traced to its training job and data version without going via the run
+                tags={
+                    "pipeline_run_id": pipeline_run_id,
+                    "data_version": data_version,
+                    "data_git_commit_id": data_git_commit_id,
+                    **sagemaker_job_tags,
+                },
             )
             
             print(f"Training complete!")
             print(f"Best validation accuracy: {best_val_acc:.4f}")
-            print(f"Model registered as: {registered_model_name}")
+            print(f"Logged model: {model_info.model_id}")
+            print(f"SageMaker training job: {sagemaker_job_tags.get('sagemaker.training_job_arn', 'local')}")
             print(f"Run ID: {run.info.run_id}")
     
     except Exception as e:

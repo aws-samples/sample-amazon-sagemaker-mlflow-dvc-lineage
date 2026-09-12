@@ -78,7 +78,7 @@ Click into any run to see training/validation loss curves, hyperparameters, and 
 
 ![MLflow Training Run Details](img/mlflow_training_run.png)
 
-Models are automatically registered in the MLflow Model Registry with version history and links to the training run that produced each model:
+Models are registered in the MLflow Model Registry with version history and links to the training run that produced each model. With the MLflow App in `AutoModelRegistrationEnabled` mode, each registration also creates a deployable Model Package in the SageMaker Model Registry:
 
 ![MLflow Registered Model](img/mlflow_registered_model.png)
 
@@ -95,7 +95,8 @@ Models are automatically registered in the MLflow Model Registry with version hi
 - **SageMaker AI MLflow App** - Managed MLflow tracking server
 - **SageMaker AI Processing** - Data preprocessing with DVC integration
 - **SageMaker AI Training** - Model training with MLflow logging (CPU instances)
-- **SageMaker AI Endpoints** - Model deployment with ModelBuilder
+- **SageMaker Model Registry** - Model Packages auto-synced from the MLflow Model Registry, carrying an inference specification logged with `sagemaker-mlflow`
+- **SageMaker AI Endpoints** - Model deployment from the registered Model Package (`Model` → `EndpointConfig` → `Endpoint`)
 
 ## Project Structure
 

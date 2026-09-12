@@ -1,12 +1,12 @@
 # SageMaker SDK v3.4.0 (requires >3.4.0 for fix to work with MLflow 3+)
-sagemaker>=3.4.0 
-sagemaker-mlflow>=0.2.0
+sagemaker>=3,<4
+sagemaker-mlflow>=0.5.0,<1
 
 # AWS
 boto3>=1.42.1
 
 # MLflow
-mlflow==3.4.0
+mlflow>=3,<4
 
 # PyTorch (required for ModelBuilder custom translators and local testing)
 torch>=2.5.0
