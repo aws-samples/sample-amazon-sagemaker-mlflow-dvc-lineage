@@ -24,7 +24,7 @@ This demo uses the [Montgomery County CXR Dataset](https://lhncbc.nlm.nih.gov/LH
    - Simulate a patient opting out
    - Reprocess and retrain without that patient's data (v2.0)
    - Run audit queries to verify the patient's data was excluded
-   - Deploy the retrained model to a SageMaker AI endpoint
+   - Pick the best consent-compliant model (only runs on the latest data version are eligible), register it and deploy it to a SageMaker AI endpoint
    - Run the same flow as a SageMaker AI Pipeline (Part 9)
 
 ## Files in This Directory
@@ -37,6 +37,7 @@ This demo uses the [Montgomery County CXR Dataset](https://lhncbc.nlm.nih.gov/LH
 | `utils/manifest_utils.py` | Registry and manifest I/O utilities |
 | `pipeline_steps/evaluate.py`, `pipeline_steps/register.py` | `@step` functions of the Part 9 pipeline |
 | `pipeline_steps/inference.py` | Inference handlers uploaded to the logged model by the register step |
+| `img/` | MLflow and SageMaker Studio screenshots used in the notebook |
 
 ## Note on Deployed Models
 
@@ -60,18 +61,28 @@ The consent registry is a pipeline parameter: when a patient opts out, update th
 
 The notebook includes cleanup cells at the end. To fully remove all resources:
 
-1. **Delete the SageMaker AI endpoint** — run the cleanup cell in the notebook
-2. **Delete the MLflow App** (optional):
+1. **Delete the SageMaker AI endpoints** — done by the cleanup cells at the end of Part 8 and Part 9
+2. **Delete the pipeline** (optional, removes its execution history):
+   ```python
+   pipeline.delete()
+   ```
+3. **Delete the Model Package group** created by the MLflow sync (optional, name `CXR-MobileNetV3-<suffix>`):
+   ```bash
+   aws sagemaker list-model-package-groups --name-contains CXR-MobileNetV3
+   ```
+4. **Delete the MLflow App** (optional):
    ```python
    sm_client.delete_mlflow_app(Arn=mlflow_app_arn)
    ```
-3. **Delete the AWS CodeCommit repository**:
+5. **Delete the AWS CodeCommit repository**:
    ```bash
    aws codecommit delete-repository --repository-name cxr-dvc-demo
    ```
-4. **Delete S3 data** (DVC cache, raw images, and MLflow artifacts):
+6. **Delete S3 data** (DVC cache, raw images, consent registries, training output, pipeline step artifacts; MLflow artifacts live under `workspaces/` in the same bucket):
    ```bash
    aws s3 rm s3://<your-bucket>/DEMO-cxr-dvc --recursive
+   aws s3 rm s3://<your-bucket>/cxr-train --recursive
+   aws s3 rm s3://<your-bucket>/cxr-dvc-mlflow-pipeline --recursive
    ```
 
 ## Prerequisites
