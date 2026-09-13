@@ -35,6 +35,8 @@ import torchvision
 
 import mlflow
 
+from mlflow_utils import get_or_create_pipeline_run
+
 
 # CIFAR-10 class names (in order of label index)
 CIFAR10_CLASSES = [
@@ -144,10 +146,16 @@ def version_with_dvc(repo_path, version_tag, pipeline_run_id):
     
     # Git add the .dvc file
     subprocess.check_call(["git", "add", "dataset.dvc", ".gitignore"], cwd=repo_path)
-    subprocess.check_call(
-        ["git", "commit", "-m", f"Add dataset version {version_tag}"],
-        cwd=repo_path
-    )
+    # Commit only if the dataset actually changed. Re-running with identical inputs (same
+    # data version / fraction / seed) produces the same DVC hash, in which case the existing
+    # commit is reused and just gets the new PIPELINE_RUN_ID tag.
+    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=repo_path).returncode != 0:
+        subprocess.check_call(
+            ["git", "commit", "-m", f"Add dataset version {version_tag}"],
+            cwd=repo_path
+        )
+    else:
+        print("Dataset unchanged since the last commit; tagging the existing commit")
     
     # Tag with pipeline_run_id (includes timestamp)
     subprocess.check_call(["git", "tag", pipeline_run_id], cwd=repo_path)
@@ -185,7 +193,10 @@ def log_to_mlflow(data_fraction, train_counts, val_counts, test_counts,
     
     run_name = f"preprocess-{pipeline_run_id}"
     
-    with mlflow.start_run(run_name=run_name) as run:
+    # All stages of one PIPELINE_RUN_ID are nested under a shared parent run
+    parent_run_id = get_or_create_pipeline_run(pipeline_run_id, version_tag)
+    with mlflow.start_run(run_id=parent_run_id), \
+         mlflow.start_run(run_name=run_name, nested=True) as run:
         mlflow.set_tags({
             "pipeline_run_id": pipeline_run_id,
             "stage": "preprocessing",

@@ -13,6 +13,7 @@ This demo uses the [Montgomery County CXR Dataset](https://lhncbc.nlm.nih.gov/LH
 - Include a **record-level manifest** linking individual data records to dataset versions
 - Run **audit queries**: "Which models were trained on patient X's data?"
 - **Verify exclusion**: confirm a patient's data is excluded from all models after their opt-out date
+- Run the whole flow as one **SageMaker AI Pipeline** with the consent registry as a parameter, every stage grouped under one MLflow parent run
 
 ## Quick Start
 
@@ -24,6 +25,7 @@ This demo uses the [Montgomery County CXR Dataset](https://lhncbc.nlm.nih.gov/LH
    - Reprocess and retrain without that patient's data (v2.0)
    - Run audit queries to verify the patient's data was excluded
    - Deploy the retrained model to a SageMaker AI endpoint
+   - Run the same flow as a SageMaker AI Pipeline (Part 9)
 
 ## Files in This Directory
 
@@ -33,10 +35,26 @@ This demo uses the [Montgomery County CXR Dataset](https://lhncbc.nlm.nih.gov/LH
 | `setup_cxr_dataset.py` | Dataset setup script (download, S3 upload, manifest generation) |
 | `utils/audit_queries.py` | MLflow audit query functions |
 | `utils/manifest_utils.py` | Registry and manifest I/O utilities |
+| `pipeline_steps/evaluate.py`, `pipeline_steps/register.py` | `@step` functions of the Part 9 pipeline |
+| `pipeline_steps/inference.py` | Inference handlers uploaded to the logged model by the register step |
 
 ## Note on Deployed Models
 
 This demo shows how to exclude a record and retrain, but does not automate the invalidation of previously deployed models. In production, after a record exclusion you would also use the audit queries to identify any deployed endpoints serving models trained on that record, and flag them for retraining or retirement.
+
+## Part 9: As a SageMaker AI Pipeline
+
+Part 9 of the notebook puts the same stages together as one parameterized SageMaker AI Pipeline, reusing the DVC repository, raw data, consent registry, MLflow App and experiment from the earlier parts:
+
+| Step | Type | What it does |
+|---|---|---|
+| `preprocess-dvc` | `ProcessingStep` | Same `FrameworkProcessor` + `preprocessing_healthcare.py`: applies the registry at `RegistryS3Uri`, patient-level split, writes `manifest.csv`, `dvc add/push`, git tag = `PIPELINE_RUN_ID` |
+| `train-mlflow` | `TrainingStep` | Same `ModelTrainer` + `train.py`: `dvc pull` at that tag, train, log run, model and manifest to MLflow (tagged with the training job) |
+| `evaluate-mlflow` | `@step` | Reads `final_val_accuracy` and `patient_count` from the MLflow run of this execution ([`pipeline_steps/evaluate.py`](./pipeline_steps/evaluate.py)) |
+| `check-val-accuracy` | `ConditionStep` | `val_accuracy >= MinValAccuracy` → register, else `FailStep` |
+| `register-model` | `@step` | Logs `code/inference.py` and the inference specification on the logged model, `mlflow.register_model()`, approves the auto-synced Model Package with `patient_count` in its metadata ([`pipeline_steps/register.py`](./pipeline_steps/register.py)) |
+
+The consent registry is a pipeline parameter: when a patient opts out, update the registry, upload it under a new prefix, and start the pipeline with that `RegistryS3Uri` and a new `DataVersion`. `PIPELINE_RUN_ID = <DataVersion>-<PipelineExecutionId>` is the DVC git tag, the MLflow run name suffix and `pipeline_run_id` tag, and is written to the Model Package metadata. In MLflow, all stages of one `PIPELINE_RUN_ID` are nested under a parent run of that name (`source_dir/mlflow_utils.py`). The Part 7 audit queries work unchanged on pipeline-produced runs.
 
 ## Cleanup
 
