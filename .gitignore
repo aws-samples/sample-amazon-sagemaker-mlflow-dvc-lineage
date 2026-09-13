@@ -20,9 +20,9 @@ sagemaker-dvc-sample
 dataset.csv
 registry_v2.csv
 
-# DVC repos created by notebooks
-cifar10-dvc-demo
-cxr-dvc-demo/
+# DVC repos cloned/created by the notebooks (any suffix, any location)
+**/cifar10-dvc-demo*/
+**/cxr-dvc-demo*/
 
 # Montgomery CXR dataset (downloaded from NLM)
 MontgomerySet/
