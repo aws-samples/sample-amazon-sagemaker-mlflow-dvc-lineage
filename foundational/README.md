@@ -8,8 +8,8 @@ With dataset-level lineage, every model links to a DVC commit hash that points t
 
 - Version processed datasets with DVC and store them in S3
 - Track experiments and link models to specific data versions with MLflow
-- Compare model performance across different data versions
-- Deploy a model from MLflow registry to an Amazon SageMaker AI endpoint
+- Compare model performance across different data versions (the notebook opens the MLflow comparison views for you)
+- Pick the best model by validation accuracy, make it deployable (inference code + inference specification logged on the MLflow model), register it, and deploy the auto-synced Model Package to an Amazon SageMaker AI endpoint
 - Run the whole flow as one SageMaker AI Pipeline, with every stage grouped under one MLflow parent run
 
 ## Quick Start
@@ -18,10 +18,10 @@ With dataset-level lineage, every model links to a DVC commit hash that points t
 2. Follow the notebook cells sequentially
 3. The notebook will:
    - Configure a DVC repository backed by S3
-   - Set up a managed MLflow tracking server
-   - Run two experiments with different data fractions (5% and 10%)
+   - Set up a managed MLflow App (with auto model registration to the SageMaker Model Registry) and a day-suffixed experiment
+   - Run two experiments with different data fractions (5% and 10%), each grouped under one MLflow parent run
    - Compare results in MLflow
-   - Deploy the best model to a SageMaker AI endpoint
+   - Register the best model and deploy it to a SageMaker AI endpoint
    - Run the same flow as a SageMaker AI Pipeline (Part 4)
 
 ## Part 4: As a SageMaker AI Pipeline
@@ -42,18 +42,28 @@ Part 4 of the notebook puts the same stages together as one parameterized SageMa
 
 The notebook includes cleanup cells at the end. To fully remove all resources:
 
-1. **Delete the SageMaker AI endpoint** — run the cleanup cell in the notebook
-2. **Delete the MLflow App** (optional):
+1. **Delete the SageMaker AI endpoints** — done by the cleanup cells at the end of Part 3 and Part 4
+2. **Delete the pipeline** (optional, removes its execution history):
+   ```python
+   pipeline.delete()
+   ```
+3. **Delete the Model Package group** created by the MLflow sync (optional, name `CIFAR10-MobileNetV3-<suffix>`):
+   ```bash
+   aws sagemaker list-model-package-groups --name-contains CIFAR10-MobileNetV3
+   ```
+4. **Delete the MLflow App** (optional):
    ```python
    sm_client.delete_mlflow_app(Arn=mlflow_app_arn)
    ```
-3. **Delete the AWS CodeCommit repository**:
+5. **Delete the AWS CodeCommit repository**:
    ```bash
    aws codecommit delete-repository --repository-name <your-dvc-repo-name>
    ```
-4. **Delete S3 data** (DVC cache and MLflow artifacts):
+6. **Delete S3 data** (DVC cache, training output, pipeline step artifacts; MLflow artifacts live under `workspaces/` in the same bucket):
    ```bash
    aws s3 rm s3://<your-bucket>/DEMO-cifar10-dvc --recursive
+   aws s3 rm s3://<your-bucket>/cifar10-train --recursive
+   aws s3 rm s3://<your-bucket>/cifar10-dvc-mlflow-pipeline --recursive
    ```
 
 ## Prerequisites

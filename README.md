@@ -38,12 +38,14 @@ Part 4 of the foundational notebook (and Part 9 of the healthcare notebook) puts
 ### Prerequisites
 
 - An AWS Account
-- Python 3.11 (tested with 3.11.14)
+- Python 3.11 or 3.12 (tested with 3.12.14; the notebooks pick the matching PyTorch 2.5 / 2.6 containers)
 - An IAM user/role with permissions for:
-  - Amazon SageMaker AI (Processing, Training, MLflow App, Endpoints)
+  - Amazon SageMaker AI (Processing, Training, Pipelines, MLflow App incl. `create-presigned-mlflow-app-url`, Model Registry, Endpoints)
   - Amazon S3
   - AWS CodeCommit
-  - IAM (to create execution roles if needed)
+  - IAM (`iam:CreateRole` / `iam:PutRolePolicy`, to create the MLflow App role)
+
+The notebooks create the MLflow App with `AutoModelRegistrationEnabled` (or switch an existing app to it), because model deployment relies on `mlflow.register_model()` syncing a Model Package to the SageMaker Model Registry. The MLflow experiment name carries a `DD-MM-YYYY` suffix, so reruns on another day land in a fresh experiment.
 
 #### IAM Role Requirements
 
@@ -72,17 +74,19 @@ The notebook uses `sagemaker.core.helper.session_helper.get_execution_role()` to
 
 ## Experiment Tracking
 
-After running the notebook, you can compare experiments in the MLflow UI. To access the UI, see [Launch the MLflow UI using a presigned URL](https://docs.aws.amazon.com/sagemaker/latest/dg/mlflow-launch-ui.html).
+The notebooks open the MLflow UI for you: they create a [presigned URL](https://docs.aws.amazon.com/sagemaker/latest/dg/mlflow-launch-ui.html) to log in, then open deep links to the run comparison (chart mode), the metric charts, the latest run, and the experiment's logged models. All stages of one data version (`preprocess-*`, `train-*`, and in the pipeline `evaluate-*` / `register-*`) are nested under a parent run named after the `PIPELINE_RUN_ID`.
 
-![MLflow Experiment Comparison](img/mlflow_experiment.png)
+![MLflow: compare the v1.0 and v2.0 training runs](healthcare-compliance/img/compare-runs.png)
 
-Click into any run to see training/validation loss curves, hyperparameters, and the DVC data version linking the exact dataset:
+Each training run records the metrics, the parameters linking to the data (`data_version`, `data_git_commit_id`), and tags linking to the SageMaker Training job (`sagemaker.training_job_name`, `sagemaker.training_job_arn`); the same tags are set on the logged model.
 
-![MLflow Training Run Details](img/mlflow_training_run.png)
+![MLflow: training run details](healthcare-compliance/img/training-metrics.png)
 
-Models are registered in the MLflow Model Registry with version history and links to the training run that produced each model. With the MLflow App in `AutoModelRegistrationEnabled` mode, each registration also creates a deployable Model Package in the SageMaker Model Registry:
+Before registration, the notebook uploads `code/inference.py` and a SageMaker inference specification onto the logged model. Because the MLflow App runs in `AutoModelRegistrationEnabled` mode, `mlflow.register_model()` then creates a deployable Model Package in the SageMaker Model Registry that serves straight from the MLflow artifact store:
 
-![MLflow Registered Model](img/mlflow_registered_model.png)
+![MLflow: logged model artifacts including code/inference.py and the inference specification](healthcare-compliance/img/logged-model-artifacts.png)
+
+![SageMaker Model Registry: the auto-synced, approved Model Package version](healthcare-compliance/img/sagemaker-deployable-model-registered.png)
 
 ## What You'll Build
 
@@ -97,6 +101,7 @@ Models are registered in the MLflow Model Registry with version history and link
 - **SageMaker AI MLflow App** - Managed MLflow tracking server
 - **SageMaker AI Processing** - Data preprocessing with DVC integration
 - **SageMaker AI Training** - Model training with MLflow logging (CPU instances)
+- **SageMaker AI Pipelines** - Processing → training → quality gate → registration as one parameterized pipeline (Part 4 / Part 9)
 - **SageMaker Model Registry** - Model Packages auto-synced from the MLflow Model Registry, carrying an inference specification logged with `sagemaker-mlflow`
 - **SageMaker AI Endpoints** - Model deployment from the registered Model Package (`Model` → `EndpointConfig` → `Endpoint`)
 
@@ -112,20 +117,21 @@ Models are registered in the MLflow Model Registry with version history and link
 │   ├── healthcare_example_record_level_lineage.ipynb # Patient consent/opt-out workflow (+ pipeline)
 │   ├── setup_cxr_dataset.py               # Dataset download, S3 upload, manifest generation
 │   ├── pipeline_steps/                     # @step functions (evaluate, register) and inference.py for Part 9
-│   └── utils/                              # Audit query and manifest utilities
+│   ├── utils/                              # Audit query and manifest utilities
+│   └── img/                                # MLflow / SageMaker Studio screenshots used in the notebook
 ├── source_dir/                             # Shared SageMaker AI job code
 │   ├── preprocessing_foundational.py       # Data-fraction sampling
 │   ├── preprocessing_healthcare.py         # Patient consent registry processing
 │   ├── train.py                            # MobileNetV3 training with MLflow logging
 │   ├── mlflow_utils.py                     # Nests all stages of one PIPELINE_RUN_ID under a parent MLflow run
 │   └── requirements.txt                    # Dependencies for SageMaker AI jobs
-├── img/                                    # MLflow UI screenshots
+├── img/                                    # Architecture diagram
 └── requirements.txt                        # Local development dependencies
 ```
 
 ## Cleanup
 
-Each notebook includes cleanup cells at the end to delete endpoints and other resources. See the individual READMEs for full cleanup instructions:
+Each notebook deletes its endpoints right after testing them (end of Parts 3/4 and 8/9) and ends with optional cells for the shared resources (pipeline definition, MLflow App, CodeCommit repository). See the individual READMEs for full cleanup instructions:
 
 - [Foundational cleanup](./foundational/README.md#cleanup)
 - [Healthcare compliance cleanup](./healthcare-compliance/README.md#cleanup)
