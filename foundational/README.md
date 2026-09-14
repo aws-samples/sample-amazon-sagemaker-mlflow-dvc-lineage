@@ -10,6 +10,7 @@ With dataset-level lineage, every model links to a DVC commit hash that points t
 - Track experiments and link models to specific data versions with MLflow
 - Compare model performance across different data versions
 - Deploy a model from MLflow registry to an Amazon SageMaker AI endpoint
+- Run the whole flow as one SageMaker AI Pipeline, with every stage grouped under one MLflow parent run
 
 ## Quick Start
 
@@ -21,6 +22,21 @@ With dataset-level lineage, every model links to a DVC commit hash that points t
    - Run two experiments with different data fractions (5% and 10%)
    - Compare results in MLflow
    - Deploy the best model to a SageMaker AI endpoint
+   - Run the same flow as a SageMaker AI Pipeline (Part 4)
+
+## Part 4: As a SageMaker AI Pipeline
+
+Part 4 of the notebook puts the same stages together as one parameterized SageMaker AI Pipeline, reusing the DVC repository, MLflow App and experiment from Parts 1 and 2:
+
+| Step | Type | What it does |
+|---|---|---|
+| `preprocess-dvc` | `ProcessingStep` | Same `FrameworkProcessor` + `preprocessing_foundational.py`: samples `DataFraction` of CIFAR-10, `dvc add/push`, git tag = `PIPELINE_RUN_ID` |
+| `train-mlflow` | `TrainingStep` | Same `ModelTrainer` + `train.py`: `dvc pull` at that tag, train, log run + model to MLflow (tagged with the training job) |
+| `evaluate-mlflow` | `@step` | Reads `final_val_accuracy` from the MLflow run of this execution ([`pipeline_steps/evaluate.py`](./pipeline_steps/evaluate.py)) |
+| `check-val-accuracy` | `ConditionStep` | `val_accuracy >= MinValAccuracy` → register, else `FailStep` |
+| `register-model` | `@step` | Logs `code/inference.py` and the inference specification on the logged model, `mlflow.register_model()`, approves the auto-synced Model Package ([`pipeline_steps/register.py`](./pipeline_steps/register.py)) |
+
+`PIPELINE_RUN_ID = <DataVersion>-<PipelineExecutionId>` is the DVC git tag, the MLflow run name suffix and `pipeline_run_id` tag, and is written to the Model Package metadata, so every artifact of an execution can be traced back to the exact data. In MLflow, all stages of one `PIPELINE_RUN_ID` are nested under a parent run of that name (`source_dir/mlflow_utils.py`), for manual runs and pipeline executions alike. Deployment stays outside the pipeline; the notebook shows how to deploy the resulting Model Package.
 
 ## Cleanup
 

@@ -33,6 +33,8 @@ The healthcare notebook uses a CSV as the registry for simplicity, but in produc
 
 Both notebooks share the same training script (`source_dir/train.py`) and follow the same architecture, with separate preprocessing scripts for each use case.
 
+Part 4 of the foundational notebook (and Part 9 of the healthcare notebook) puts the same stages together as a single parameterized **SageMaker AI Pipeline**: a `ProcessingStep` that versions the data with DVC, a `TrainingStep` that logs to MLflow, an `@step` quality gate on the validation accuracy, and an `@step` that logs the inference specification and registers the model, producing an approved, deployable Model Package with full lineage per execution. In the healthcare variant the consent registry is a pipeline parameter, so an opt-out is one `pipeline.start()` with the updated registry. All stages of one run (manual or pipeline) are nested under a parent MLflow run named after the `PIPELINE_RUN_ID`.
+
 ### Prerequisites
 
 - An AWS Account
@@ -103,16 +105,19 @@ Models are registered in the MLflow Model Registry with version history and link
 ```
 ├── foundational/                           # Start here
 │   ├── README.md
-│   └── foundational_dataset_level_lineage.ipynb               # Foundational notebook (data fraction comparison)
+│   ├── foundational_dataset_level_lineage.ipynb               # Foundational notebook (data fraction comparison + pipeline)
+│   └── pipeline_steps/                     # @step functions (evaluate, register) and inference.py for Part 4
 ├── healthcare-compliance/                  # Extended use case
 │   ├── README.md
-│   ├── healthcare_example_record_level_lineage.ipynb # Patient consent/opt-out workflow
+│   ├── healthcare_example_record_level_lineage.ipynb # Patient consent/opt-out workflow (+ pipeline)
 │   ├── setup_cxr_dataset.py               # Dataset download, S3 upload, manifest generation
+│   ├── pipeline_steps/                     # @step functions (evaluate, register) and inference.py for Part 9
 │   └── utils/                              # Audit query and manifest utilities
 ├── source_dir/                             # Shared SageMaker AI job code
 │   ├── preprocessing_foundational.py       # Data-fraction sampling
 │   ├── preprocessing_healthcare.py         # Patient consent registry processing
 │   ├── train.py                            # MobileNetV3 training with MLflow logging
+│   ├── mlflow_utils.py                     # Nests all stages of one PIPELINE_RUN_ID under a parent MLflow run
 │   └── requirements.txt                    # Dependencies for SageMaker AI jobs
 ├── img/                                    # MLflow UI screenshots
 └── requirements.txt                        # Local development dependencies

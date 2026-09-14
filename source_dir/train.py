@@ -40,6 +40,8 @@ import mlflow
 import mlflow.pytorch
 from mlflow.models import infer_signature
 
+from mlflow_utils import get_or_create_pipeline_run
+
 
 # SageMaker paths
 INPUT_PATH = '/opt/ml/input/data'
@@ -234,7 +236,10 @@ def main():
     print("Starting training...")
     
     try:
-        with mlflow.start_run(run_name=run_name) as run:
+        # All stages of one PIPELINE_RUN_ID are nested under a shared parent run
+        parent_run_id = get_or_create_pipeline_run(pipeline_run_id, data_version)
+        with mlflow.start_run(run_id=parent_run_id), \
+             mlflow.start_run(run_name=run_name, nested=True) as run:
             # Set tags: lineage tags plus the SageMaker Training job that produced this run
             sagemaker_job_tags = get_sagemaker_job_tags()
             mlflow.set_tags({

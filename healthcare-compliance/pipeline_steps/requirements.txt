@@ -1,0 +1,5 @@
+# Dependencies for the @step functions (evaluate, register) of the healthcare-compliance pipeline.
+# They run in the PyTorch training image, which does not ship mlflow.
+sagemaker>=3,<4
+sagemaker-mlflow>=0.5.0,<1
+mlflow>=3,<4
