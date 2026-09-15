@@ -15,10 +15,14 @@ Same pattern as Part 8 of the healthcare notebook, run as a pipeline step:
    ``AutoModelRegistrationEnabled`` mode, and the specification logged FIRST,
    the auto-synced SageMaker Model Package is created already deployable.
 5. Set the approval status and lineage metadata on the Model Package.
+6. Add the lineage edges SageMaker cannot infer by itself: the DVC dataset (pulled
+   inside the training container, so invisible to the training job's inputs) and the
+   link from the training job to the auto-synced ``MLflow Experiment`` node.
 """
 
 import os
 import shutil
+import sys
 import tempfile
 import time
 
@@ -26,6 +30,9 @@ import boto3
 import mlflow
 from mlflow import MlflowClient
 import sagemaker_mlflow
+
+# utils/ sits next to pipeline_steps/ in the working directory that @step uploads
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def register(
@@ -40,6 +47,9 @@ def register(
     training_job_name: str,
     val_accuracy: float,
     patient_count: str = "unknown",
+    dvc_remote_uri: str = None,
+    dvc_repo_url: str = None,
+    processing_job_name: str = None,
 ) -> dict:
     mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     client = MlflowClient()
@@ -138,7 +148,36 @@ def register(
         "mlflow_model_id": logged_model.model_id,
     }
 
-    # 6. Record the registration as a nested run under the pipeline's parent run, so the
+    # 6. The two edges SageMaker's automatic lineage cannot produce:
+    #    - the DVC dataset: train.py pulls it inside the container, so the training job's
+    #      only recorded inputs are its code / sm_drivers channels,
+    #    - training job -> MLflow Experiment: the auto-sync links that node to the Model
+    #      Package, but not to the job that produced the run.
+    #    Deliberately non-fatal: an already registered, approved and deployable Model
+    #    Package should not be lost to a lineage permission or timing problem.
+    dataset_artifact_arn = None
+    if dvc_remote_uri:
+        try:
+            from utils.lineage_utils import record_run_lineage
+
+            lineage = record_run_lineage(
+                mlflow_run_id=mlflow_run_id,
+                training_job_name=training_job_name,
+                data_version=data_version,
+                data_git_commit_id=data_git_commit_id,
+                dvc_remote_uri=dvc_remote_uri,
+                dvc_repo_url=dvc_repo_url,
+                pipeline_run_id=pipeline_run_id,
+                processing_job_name=processing_job_name,
+                dataset_properties={"patient_count": str(patient_count)},
+                sm_client=sm_client,
+            )
+            dataset_artifact_arn = lineage["dataset_artifact_arn"]
+            result["dataset_artifact_arn"] = dataset_artifact_arn
+        except Exception as error:  # noqa: BLE001 - lineage must not fail registration
+            print(f"WARNING: could not record DVC dataset lineage: {error}")
+
+    # 7. Record the registration as a nested run under the pipeline's parent run, so the
     #    parent shows preprocessing -> training -> evaluation -> registration in one place.
     with mlflow.start_run(run_id=parent_run_id), \
          mlflow.start_run(run_name=f"register-{pipeline_run_id}", nested=True):

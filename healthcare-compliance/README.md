@@ -35,6 +35,7 @@ This demo uses the [Montgomery County CXR Dataset](https://lhncbc.nlm.nih.gov/LH
 | `setup_cxr_dataset.py` | Dataset setup script (download, S3 upload, manifest generation) |
 | `utils/audit_queries.py` | MLflow audit query functions |
 | `utils/manifest_utils.py` | Registry and manifest I/O utilities |
+| `utils/lineage_utils.py` | Adds the DVC dataset node and the training job → MLflow Experiment edge that SageMaker's automatic lineage cannot infer |
 | `pipeline_steps/evaluate.py`, `pipeline_steps/register.py` | `@step` functions of the Part 9 pipeline |
 | `pipeline_steps/inference.py` | Inference handlers uploaded to the logged model by the register step |
 | `img/` | MLflow and SageMaker Studio screenshots used in the notebook |
